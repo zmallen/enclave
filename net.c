@@ -32,14 +32,15 @@ void *
 edge_accept(void *arg)
 {
 	struct sockaddr_storage addrstorage;
-	int *s, nsock;
+	int nsock;
 	socklen_t len;
+	struct listener *ent;
 
 	len = sizeof(struct sockaddr_storage);
-	s = (int *)arg;
-	printf("in thread accept on fd %d\n", *s);
+	ent = (struct listener *)arg;
+	printf("in thread accept on fd %d\n", ent->l_fd);
 	while (1) {
-		nsock = accept(*s, (struct sockaddr *)&addrstorage, &len);
+		nsock = accept(ent->l_fd, (struct sockaddr *)&addrstorage, &len);
 		if (nsock == -1) {
 			(void) fprintf(stderr, "accept failed: %s\n",
 			    strerror(errno));
@@ -85,7 +86,8 @@ edge_setup_sockets(struct cmd_options *cmd)
 	bzero(es, sizeof(*es));
 	o = 1;
 	error = 0;
-	for (res = res0; res && es->nsocks < MAXSOCKS; res = res->ai_next) {
+	for (res = res0; res != NULL && es->nsocks < MAXSOCKS;
+	    res = res->ai_next) {
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (s == -1) {
 			(void) fprintf(stderr, "socket: %s\n", strerror(errno));
@@ -94,12 +96,6 @@ edge_setup_sockets(struct cmd_options *cmd)
 		}
 		if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &o, sizeof(o)) == -1) {
 			(void) fprintf(stderr, "setsockopt(SO_REUSEADDR): %s\n",
-			    strerror(errno));
-			error = 1;
-			break;
-		}
-		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &o, sizeof(o)) == -1) {
-			(void) fprintf(stderr, "setsockopt(SO_REUSEPORT): %s\n",
 			    strerror(errno));
 			error = 1;
 			break;

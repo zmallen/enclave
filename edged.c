@@ -29,11 +29,34 @@
 #include "net.h"
 #include "privsep.h"
 
+static struct listener *head, *tail;
+
+struct listener *
+add_listener(int fd)
+{
+	struct listener *ent;
+
+	ent = calloc(1, sizeof(*ent));
+	if (ent == NULL) {
+		(void) fprintf(stderr, "failed to allocate\n");
+		exit(1);
+	}
+	ent->l_fd = fd;
+	ent->l_next = NULL;
+	if (head == NULL)
+		head = ent;
+	else
+		tail->l_next = ent;
+	tail = ent;
+	return (ent);
+}
+
 int
 main(int argc, char *argv [])
 {
 	struct edge_socks *es;
 	struct cmd_options cmd;
+	struct listener *ent;
 	int ch, j;
 	pthread_t tob;
 
@@ -64,7 +87,8 @@ main(int argc, char *argv [])
 		return (-1);
 	}
 	for (j = 0; j < es->nsocks; j++) {
-		if (pthread_create(&tob, NULL, edge_accept, &es->socks[j]) != 0) {
+		ent = add_listener(es->socks[j]);
+		if (pthread_create(&tob, NULL, edge_accept, ent) != 0) {
 			(void) fprintf(stderr, "failed to launch thread\n");
 			return (-1);
 		}

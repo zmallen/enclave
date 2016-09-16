@@ -22,4 +22,10 @@ struct cmd_options {
 	char	*port;
 };
 
+struct listener {
+        pthread_t        l_thr;
+        int              l_fd;
+        struct listener *l_next;
+};
+
 #endif	/* EDGED_DOT_H_ */
