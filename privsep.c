@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pwd.h>
 
 #include "edged.h"
 #include "privsep.h"
@@ -80,6 +81,26 @@ sig_pass_to_chld(int sig)
 	errno = oerrno;
 }
 
+static void
+priv_setuid(void)
+{
+	struct passwd *pwd;
+
+	pwd = getpwnam("nobody");
+	if (pwd == NULL) {
+		(void) fprintf(stderr, "failed to get privsep uid\n");
+		exit(1);
+	}
+	if (setgid(pwd->pw_gid) == -1) {
+		(void) fprintf(stderr, "setgid failed\n");
+		exit(1);
+	}
+	if (setuid(pwd->pw_uid) == -1) {
+		(void) fprintf(stderr, "setuid failed\n");
+		exit(1);
+	}
+}
+
 int
 priv_init(struct cmd_options *clp)
 {
@@ -99,6 +120,8 @@ priv_init(struct cmd_options *clp)
 		exit(1);
 	}
 	if (child_pid == 0) {
+		(void) close(socks[0]);
+		priv_setuid();
 #ifdef __FreeBSD__
 		(void) fprintf(stdout, "Entering capability mode sandbox\n");
 		if (cap_enter() == -1) {
@@ -108,8 +131,7 @@ priv_init(struct cmd_options *clp)
 		}
 #endif
 		/* NB: seccomp_bpf, chroot or whatever else
-                   Child - drop privileges and return */
-		close(socks[0]);
+		   Child - drop privileges and return */
 		priv_fd = socks[1];
 		return 0;
 	}
