@@ -50,6 +50,7 @@
 #include "privsep.h"
 #include "net.h"
 #include "privsep_fdpass.h"
+#include "secbpf.h"
 
 static volatile pid_t child_pid = -1;
 static int priv_fd = -1;
@@ -129,7 +130,11 @@ priv_init(struct cmd_options *clp)
 			    strerror(errno));
 			exit(1);
 		}
-#endif
+#endif /* __FreeBSD__ */
+#ifdef linux
+		(void) fprintf(stdout, "Entering seccomp BPF mode sandbox\n");
+		seccomp_activate();
+#endif /* linux */
 		/* NB: seccomp_bpf, chroot or whatever else
 		   Child - drop privileges and return */
 		priv_fd = socks[1];
