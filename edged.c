@@ -58,7 +58,6 @@ main(int argc, char *argv [])
 	struct cmd_options cmd;
 	struct listener *ent;
 	int ch, j;
-	pthread_t tob;
 
 	cmd.family = PF_UNSPEC;
 	cmd.src = NULL;
@@ -88,13 +87,16 @@ main(int argc, char *argv [])
 	}
 	for (j = 0; j < es->nsocks; j++) {
 		ent = add_listener(es->socks[j]);
-		if (pthread_create(&tob, NULL, edge_accept, ent) != 0) {
+		if (pthread_create(&ent->l_thr, NULL, edge_accept, ent) != 0) {
 			(void) fprintf(stderr, "failed to launch thread\n");
 			return (-1);
 		}
 		(void) fprintf(stdout, "launched thread for fd %d\n",
 		    es->socks[j]);
 	}
-	pause();
+	while (head != NULL) {
+		pthread_join(head->l_thr, &head->l_ret);
+		head = head->l_next;
+	}
 	return (0);
 }

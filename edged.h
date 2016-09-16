@@ -23,9 +23,10 @@ struct cmd_options {
 };
 
 struct listener {
-        pthread_t        l_thr;
-        int              l_fd;
-        struct listener *l_next;
+	pthread_t	 l_thr;
+	int		 l_fd;
+	struct listener *l_next;
+	void		*l_ret;
 };
 
 #endif	/* EDGED_DOT_H_ */
