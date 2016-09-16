@@ -18,7 +18,9 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-
+#ifdef __FreeBSD__
+#include <sys/capsicum.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -82,6 +84,14 @@ priv_init(struct cmd_options *clp)
 		exit(1);
 	}
 	if (child_pid == 0) {
+#ifdef __FreeBSD__
+		(void) fprintf(stdout, "Entering capability mode sandbox\n");
+		if (cap_enter() == -1) {
+			(void) fprintf(stderr, "cap_enter failed: %s\n",
+			    strerror(errno));
+			exit(1);
+		}
+#endif
 		/* NB: seccomp_bpf, chroot or whatever else
                    Child - drop privileges and return */
 		close(socks[0]);
