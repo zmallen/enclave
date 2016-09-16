@@ -201,6 +201,7 @@ priv_get_ctl_socks(void)
 	must_read(priv_fd, ep, sizeof(*ep));
 	for (k = 0; k < ep->nsocks; k++) {
 		ep->socks[k] = receive_fd(priv_fd);
+		printf("got fd %d from privelged process\n", ep->socks[k]);
 	}
 	return (ep);
 }

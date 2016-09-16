@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "edged.h"
 #include "net.h"
@@ -33,7 +34,8 @@ main(int argc, char *argv [])
 {
 	struct edge_socks *es;
 	struct cmd_options cmd;
-	int ch;
+	int ch, j;
+	pthread_t tob;
 
 	cmd.family = PF_UNSPEC;
 	cmd.src = NULL;
@@ -57,5 +59,18 @@ main(int argc, char *argv [])
 	argv += optind;
 	priv_init(&cmd);
 	es = priv_get_ctl_socks();
+	if (es == NULL) {
+		(void) fprintf(stderr, "error setting up control socks\n");
+		return (-1);
+	}
+	for (j = 0; j < es->nsocks; j++) {
+		if (pthread_create(&tob, NULL, edge_accept, &es->socks[j]) != 0) {
+			(void) fprintf(stderr, "failed to launch thread\n");
+			return (-1);
+		}
+		(void) fprintf(stdout, "launched thread for fd %d\n",
+		    es->socks[j]);
+	}
+	pause();
 	return (0);
 }

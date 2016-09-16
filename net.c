@@ -28,6 +28,29 @@
 #include "net.h"
 #include "privsep.h"
 
+void *
+edge_accept(void *arg)
+{
+	struct sockaddr_storage addrstorage;
+	int *s, nsock;
+	socklen_t len;
+
+	len = sizeof(struct sockaddr_storage);
+	s = (int *)arg;
+	printf("in thread accept on fd %d\n", *s);
+	while (1) {
+		nsock = accept(*s, (struct sockaddr *)&addrstorage, &len);
+		if (nsock == -1) {
+			(void) fprintf(stderr, "accept failed: %s\n",
+			    strerror(errno));
+			break;
+		}
+		(void) fprintf(stderr, "accepted connection\n");
+		(void) close(nsock);
+	}
+	return (NULL);
+}
+
 void
 edge_cleanup_socks(struct edge_socks *es)
 {
@@ -92,6 +115,7 @@ edge_setup_sockets(struct cmd_options *cmd)
 			break;
 		}
 		es->socks[es->nsocks++] = s;
+		printf("setup socket fd %d\n", s);
 	}
 	if (error) {
 		edge_cleanup_socks(es);

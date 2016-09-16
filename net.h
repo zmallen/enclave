@@ -25,5 +25,6 @@ struct edge_socks {
 void	edge_cleanup_socks(struct edge_socks *);
 struct edge_socks *
 	edge_setup_sockets(struct cmd_options *);
+void	*edge_accept(void *);
 
 #endif
