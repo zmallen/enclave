@@ -1,0 +1,206 @@
+/*
+ * Copyright (c) 2003 Can Erkin Acar
+ * Copyright (c) 2003 Anil Madhavapeddy <anil@recoil.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "edged.h"
+#include "privsep.h"
+#include "net.h"
+#include "privsep_fdpass.h"
+
+static volatile pid_t child_pid = -1;
+static int priv_fd = -1;
+volatile sig_atomic_t gotsig_chld = 0;
+
+/* Proto-types */
+static void sig_pass_to_chld(int);
+static void sig_chld(int);
+static int  may_read(int, void *, size_t);
+static void must_read(int, void *, size_t);
+static void must_write(int, void *, size_t);
+
+static void
+sig_chld(int sig)
+{
+
+	gotsig_chld = 1;
+}
+
+/* If priv parent gets a TERM or HUP, pass it through to child instead */
+static void
+sig_pass_to_chld(int sig)
+{
+	int oerrno;
+
+	oerrno = errno;
+	if (child_pid != -1)
+		(void) kill(child_pid, sig);
+	errno = oerrno;
+}
+
+int
+priv_init(struct cmd_options *clp)
+{
+	int i, socks[2], cmd;
+	struct edge_socks *esp;
+
+	for (i = 1; i < NSIG; i++)
+		signal(i, SIG_DFL);
+	/* Create sockets */
+	if (socketpair(AF_LOCAL, SOCK_STREAM, PF_UNSPEC, socks) == -1) {
+		(void) fprintf(stderr, "socketpair: %s\n", strerror(errno));
+		exit(1);
+	}
+	child_pid = fork();
+	if (child_pid == -1) {
+		(void) fprintf(stderr, "fork: %s\n", strerror(errno));
+		exit(1);
+	}
+	if (child_pid == 0) {
+		/* NB: seccomp_bpf, chroot or whatever else
+                   Child - drop privileges and return */
+		close(socks[0]);
+		priv_fd = socks[1];
+		return 0;
+	}
+	/* Pass ALRM/TERM/HUP/INT/QUIT through to child, and accept CHLD */
+	signal(SIGALRM, sig_pass_to_chld);
+	signal(SIGTERM, sig_pass_to_chld);
+	signal(SIGHUP,  sig_pass_to_chld);
+	signal(SIGINT,  sig_pass_to_chld);
+	signal(SIGQUIT,  sig_pass_to_chld);
+	signal(SIGCHLD, sig_chld);
+	/* NB: prctl to name process
+        setproctitle("[priv]"); */
+	close(socks[1]);
+	while (!gotsig_chld) {
+		if (may_read(socks[0], &cmd, sizeof(int)))
+			break;
+		switch (cmd) {
+		case PRIV_GET_CTL_SOCKS:
+			esp = edge_setup_sockets(clp);
+			if (esp == NULL) {
+				(void) fprintf(stderr, "failed to setup control sockets\n");
+				exit(1);
+			}
+			must_write(socks[0], esp, sizeof(*esp));
+			for (i = 0; i < esp->nsocks; i++)
+				send_fd(socks[0], esp->socks[i]);
+			break;
+		}
+		/* NB: switch cmd PRIVSEP_GET_CTL_SOCKS */
+	}
+	_exit(1);
+}
+
+/* Read all data or return 1 for error.  */
+static int
+may_read(int fd, void *buf, size_t n)
+{
+	char *s = buf;
+	ssize_t res, pos = 0;
+
+	while (n > pos) {
+		res = read(fd, s + pos, n - pos);
+		switch (res) {
+		case -1:
+			if (errno == EINTR || errno == EAGAIN)
+				continue;
+		case 0:
+			return (1);
+		default:
+			pos += res;
+		}
+	}
+	return (0);
+}
+
+/* Read data with the assertion that it all must come through, or
+ * else abort the process.  Based on atomicio() from openssh. */
+static void
+must_read(int fd, void *buf, size_t n)
+{
+	char *s = buf;
+	ssize_t res, pos = 0;
+
+	while (n > pos) {
+		res = read(fd, s + pos, n - pos);
+		switch (res) {
+		case -1:
+			if (errno == EINTR || errno == EAGAIN)
+				continue;
+		case 0:
+			_exit(0);
+		default:
+			pos += res;
+		}
+	}
+}
+
+/* Write data with the assertion that it all has to be written, or
+ * else abort the process.  Based on atomicio() from openssh. */
+static void
+must_write(int fd, void *buf, size_t n)
+{
+	char *s = buf;
+	ssize_t res, pos = 0;
+
+	while (n > pos) {
+		res = write(fd, s + pos, n - pos);
+		switch (res) {
+		case -1:
+			if (errno == EINTR || errno == EAGAIN)
+				continue;
+		case 0:
+			_exit(0);
+		default:
+			pos += res;
+		}
+	}
+}
+
+/*
+ * Functions to be used by the non-privleged process
+ */
+struct edge_socks *
+priv_get_ctl_socks(void)
+{
+	struct edge_socks *ep;
+	int cmd, k;
+
+	ep = malloc(sizeof(*ep));
+	if (ep == NULL)
+		return (NULL);
+	cmd = PRIV_GET_CTL_SOCKS;
+	must_write(priv_fd, &cmd, sizeof(int));
+	must_read(priv_fd, ep, sizeof(*ep));
+	for (k = 0; k < ep->nsocks; k++) {
+		ep->socks[k] = receive_fd(priv_fd);
+	}
+	return (ep);
+}
