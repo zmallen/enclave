@@ -112,8 +112,6 @@ main(int argc, char *argv [])
 			cmd.port = optarg;
 			break;
 		}
-	argc -= optind;
-	argv += optind;
 	priv_init(&cmd);
 	if (cmd.name != NULL) {
 		do_cached(&cmd);

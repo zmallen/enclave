@@ -109,6 +109,7 @@ priv_init(struct cmd_options *clp)
 	int i, socks[2], cmd;
 	struct edge_socks *esp;
 
+	(void) fprintf(stderr, "creating sandbox\n");
 	for (i = 1; i < NSIG; i++)
 		signal(i, SIG_DFL);
 	/* Create sockets */
