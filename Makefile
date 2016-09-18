@@ -1,7 +1,7 @@
 CC?=	cc
 CFLAGS= -Wall -g -fstack-protector -DSECCOMP_AUDIT_ARCH=AUDIT_ARCH_X86_64 -DSECCOMP_FILTER_DEBUG
-TARGETS=	edged
-OBJ=	edged.o privsep.o privsep_fdpass.o net.o secbpf.o
+TARGETS=	edged 
+OBJ=	edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o
 LIBS=	-lpthread
 
 all:	$(TARGETS)
