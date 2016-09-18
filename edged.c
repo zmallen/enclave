@@ -77,8 +77,6 @@ main(int argc, char *argv [])
 			cmd.port = optarg;
 			break;
 		}
-	argc -= optind;
-	argv += optind;
 	priv_init(&cmd);
 	es = priv_get_ctl_socks();
 	if (es == NULL) {
