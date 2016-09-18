@@ -28,6 +28,7 @@
 #include "edged.h"
 #include "net.h"
 #include "privsep.h"
+#include "privsep_fdpass.h"
 
 static struct listener *head, *tail;
 
@@ -51,6 +52,37 @@ add_listener(int fd)
 	return (ent);
 }
 
+void
+do_cached(struct cmd_options *cmd)
+{
+	int sock, cs;
+	int osock;
+	char buf[256];
+
+	sock = priv_bind_unix(cmd->name);
+	while (1) {
+		cs = accept(sock, NULL, NULL);
+		if (cs == -1) {
+			(void) fprintf(stderr, "error in accept\n");
+			exit(1);
+		}
+		printf("accepted connection\n");
+		osock = receive_fd(cs);
+		printf("got fd %d\n", osock);
+		while (1) {
+			size_t cc;
+
+			cc = recv(osock, buf, sizeof(buf), 0);
+			printf("read %zu bytes\n", cc);
+			printf("%s\n", buf);
+			if (cc == 0)
+				break;
+		}
+		(void) close(cs);
+	}
+	return;
+}
+
 int
 main(int argc, char *argv [])
 {
@@ -62,13 +94,16 @@ main(int argc, char *argv [])
 	cmd.family = PF_UNSPEC;
 	cmd.src = NULL;
 	cmd.port = "http";
-	while ((ch = getopt(argc, argv, "46p:s:")) != -1)
+	while ((ch = getopt(argc, argv, "46n:p:s:")) != -1)
 		switch (ch) {
 		case '4':
 			cmd.family = PF_INET;
 			break;
 		case '6':
 			cmd.family = PF_INET6;
+			break;
+		case 'n':
+			cmd.name = optarg;
 			break;
 		case 's':
 			cmd.src = optarg;
@@ -80,6 +115,10 @@ main(int argc, char *argv [])
 	argc -= optind;
 	argv += optind;
 	priv_init(&cmd);
+	if (cmd.name != NULL) {
+		do_cached(&cmd);
+		return (0);
+	}
 	es = priv_get_ctl_socks();
 	if (es == NULL) {
 		(void) fprintf(stderr, "error setting up control socks\n");

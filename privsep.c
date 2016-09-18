@@ -51,6 +51,7 @@
 #include "net.h"
 #include "privsep_fdpass.h"
 #include "secbpf.h"
+#include "unix.h"
 
 static volatile pid_t child_pid = -1;
 static int priv_fd = -1;
@@ -154,6 +155,21 @@ priv_init(struct cmd_options *clp)
 		if (may_read(socks[0], &cmd, sizeof(int)))
 			break;
 		switch (cmd) {
+		case PRIV_CONNECT_UNIX:
+		case PRIV_BIND_UNIX:
+			{
+			int sock;
+			char sockname[256];
+
+			bzero(sockname, sizeof(sockname));
+			must_read(socks[0], sockname, sizeof(sockname) - 1);
+			if (cmd == PRIV_BIND_UNIX)
+				sock = unix_bind(sockname);
+			if (cmd == PRIV_CONNECT_UNIX)
+				sock = unix_connect(sockname);
+			send_fd(socks[0], sock);
+			}
+			break;
 		case PRIV_GET_CTL_SOCKS:
 			esp = edge_setup_sockets(clp);
 			if (esp == NULL) {
@@ -256,4 +272,35 @@ priv_get_ctl_socks(void)
 		printf("got fd %d from privelged process\n", ep->socks[k]);
 	}
 	return (ep);
+}
+
+
+int
+priv_connect_unix(char *name)
+{
+	char path[256];
+	int cmd, s;
+
+	cmd = PRIV_CONNECT_UNIX;
+	bzero(path, sizeof(path));
+	strcpy(path, name);
+	must_write(priv_fd, &cmd, sizeof(cmd));
+	must_write(priv_fd, path, sizeof(path));
+	s = receive_fd(priv_fd);
+	return (s);
+}
+
+int
+priv_bind_unix(char *name)
+{
+	char path[256];
+	int cmd, s;
+
+	cmd = PRIV_BIND_UNIX;
+	bzero(path, sizeof(path));
+	strcpy(path, name);
+	must_write(priv_fd, &cmd, sizeof(cmd));
+	must_write(priv_fd, path, sizeof(path));
+	s = receive_fd(priv_fd);
+	return (s);
 }
