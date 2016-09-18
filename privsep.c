@@ -93,11 +93,11 @@ priv_setuid(void)
 		(void) fprintf(stderr, "failed to get privsep uid\n");
 		exit(1);
 	}
-	if (setgid(pwd->pw_gid) == -1) {
+	if (setgid(pwd->pw_gid) == -1 && errno != EPERM) {
 		(void) fprintf(stderr, "setgid failed\n");
 		exit(1);
 	}
-	if (setuid(pwd->pw_uid) == -1) {
+	if (setuid(pwd->pw_uid) == -1 && errno != EPERM) {
 		(void) fprintf(stderr, "setuid failed\n");
 		exit(1);
 	}
