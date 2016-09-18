@@ -23,22 +23,89 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <regex.h>
 
 #include "edged.h"
 #include "net.h"
 #include "privsep.h"
+#include "privsep_fdpass.h"
+
+int
+edge_parse_line(regex_t *rp, char *line, char **k, char **v)
+{
+	regmatch_t mgroups[10];
+	size_t len;
+	char *copy;
+
+	if (regexec(rp, line, 10, mgroups, 0)) {
+		*k = *v = NULL;
+		return (-1);
+	}
+	if (mgroups[3].rm_so != -1) {
+		*k = *v = NULL;
+		return (-1);
+	}
+	len = strlen(line) + 1;
+	copy = calloc(1, len);
+	if (copy == NULL) {
+		(void) fprintf(stderr, "calloc failed\n");
+		*k = *v = NULL;
+		return (-1);
+	}
+	strcpy(copy, line);
+	copy[mgroups[1].rm_eo] = '\0';
+	*k = strdup(copy + mgroups[1].rm_so);
+	bzero(copy, len);
+	strcpy(copy, line);
+	copy[mgroups[2].rm_eo] = '\0';
+	*v = strdup(copy + mgroups[2].rm_so);
+	free(copy);
+	return (0);
+}
+
+int
+edge_peek_hosthdr(int sock, regex_t *rp)
+{
+	char hbuf[2048], *state, *k, *v, *ptr;
+	ssize_t cc;
+	regex_t rd;
+
+	while (1) {
+		cc = recv(sock, hbuf, sizeof(hbuf), MSG_PEEK);
+		if (cc == 0)
+			return (0);
+		if (cc == -1 && errno == EINTR)
+			continue;
+		state = &hbuf[0];
+		while ((ptr = strtok_r(state, "\n", &state))) {
+			edge_parse_line(&rd, ptr, &k, &v);
+			if (k == NULL || v == NULL)
+				continue;
+			free(k);
+			free(v);
+		}
+		break;
+	}
+	return (0);
+}
 
 void *
 edge_accept(void *arg)
 {
 	struct sockaddr_storage addrstorage;
-	int nsock;
-	socklen_t len;
 	struct listener *ent;
+	socklen_t len;
+	regex_t rd;
+	int nsock;
+
 
 	len = sizeof(struct sockaddr_storage);
 	ent = (struct listener *)arg;
 	printf("in thread accept on fd %d\n", ent->l_fd);
+        if (regcomp(&rd, "^(.*): (.*)", REG_EXTENDED)) {
+                (void) fprintf(stderr, "failed to compile re\n");
+                return (NULL);
+        }
 	while (1) {
 		nsock = accept(ent->l_fd, (struct sockaddr *)&addrstorage, &len);
 		if (nsock == -1) {
@@ -47,6 +114,7 @@ edge_accept(void *arg)
 			break;
 		}
 		(void) fprintf(stderr, "accepted connection\n");
+		edge_peek_hosthdr(nsock, &rd);
 		(void) close(nsock);
 	}
 	return (NULL);

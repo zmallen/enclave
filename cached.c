@@ -13,21 +13,38 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#ifndef EDGED_DOT_H_
-#define	EDGED_DOT_H_
+#include <sys/types.h>
+#include <sys/socket.h>
 
-struct cmd_options {
-	int	 family;
-	char	*src;
-	char	*port;
-	char	*name;
-};
+#include <netdb.h>
+#include <stdio.h>
+#include <strings.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
 
-struct listener {
-	pthread_t	 l_thr;
-	int		 l_fd;
-	struct listener *l_next;
-	void		*l_ret;
-};
+#include "edged.h"
+#include "net.h"
+#include "privsep.h"
 
-#endif	/* EDGED_DOT_H_ */
+int
+main(int argc, char *argv [])
+{
+	struct cmd_options cmd;
+	int ch, sock;
+
+	cmd.name = NULL;
+	while ((ch = getopt(argc, argv, "46p:s:")) != -1)
+		switch (ch) {
+		case 'p':
+			cmd.name = optarg;
+			break;
+		}
+	argc -= optind;
+	argv += optind;
+	priv_init(&cmd);
+	sock = priv_bind_unix(cmd.name);
+	return (0);
+}
