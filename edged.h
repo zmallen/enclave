@@ -21,6 +21,7 @@ struct cmd_options {
 	char	*src;
 	char	*port;
 	char	*name;
+	char	*config;
 };
 
 struct listener {
@@ -29,5 +30,15 @@ struct listener {
 	struct listener *l_next;
 	void		*l_ret;
 };
+
+struct occupant {
+	char	o_name[256];
+	char	o_logfile[256];
+	char	o_sockpath[256];
+	char	o_backend[256];
+	char	o_port[256];
+	char	o_vcl[1024];
+};
+
 
 #endif	/* EDGED_DOT_H_ */
