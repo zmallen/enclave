@@ -152,6 +152,16 @@ static const struct sock_filter preauth_insns[] = {
 #ifdef __NR_getsockname
 	SC_ALLOW(getsockname),
 #endif
+#ifdef __NR_fcntl
+	/*
+	 * NB: fcntl() and fstat is allowed in capsicum (FreeBSDS) however we probably
+	 * want to do some additional scoping based on arguments.
+	 */
+	SC_ALLOW(fcntl),
+	SC_ALLOW(fstat),
+	SC_ALLOW(lseek),
+	SC_ALLOW(ioctl),
+#endif
 	/* Default deny */
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_FILTER_FAIL),
 };
