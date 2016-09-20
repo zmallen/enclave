@@ -188,6 +188,15 @@ edge_setup_sockets(struct cmd_options *cmd)
 			error = 1;
 			break;
 		}
+		if (res->ai_family == PF_INET6) {
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &o,
+			    sizeof(o)) == -1) {
+				(void) fprintf(stderr,
+				    "setsockopt(IPV6_V6ONLY): %s\n",
+				    strerror(errno));
+				exit(1);
+			}
+		}
 		if (bind(s, res->ai_addr, res->ai_addrlen) == -1) {
 			(void) fprintf(stderr, "bind: %s\n", strerror(errno));
 			error = 1;
