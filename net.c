@@ -29,6 +29,7 @@
 #include "net.h"
 #include "privsep.h"
 #include "privsep_fdpass.h"
+#include "util.h"
 
 int
 edge_parse_line(regex_t *rp, char *line, char **k, char **v)
@@ -52,11 +53,11 @@ edge_parse_line(regex_t *rp, char *line, char **k, char **v)
 		*k = *v = NULL;
 		return (-1);
 	}
-	strcpy(copy, line);
+	bsd_strlcpy(copy, line, len -1);
 	copy[mgroups[1].rm_eo] = '\0';
 	*k = strdup(copy + mgroups[1].rm_so);
 	bzero(copy, len);
-	strcpy(copy, line);
+	bsd_strlcpy(copy, line, len - 1);
 	copy[mgroups[2].rm_eo] = '\0';
 	*v = strdup(copy + mgroups[2].rm_so);
 	free(copy);
@@ -71,7 +72,11 @@ edge_peek_hosthdr(int sock, regex_t *rp)
 	regex_t rd;
 
 	while (1) {
-		cc = recv(sock, hbuf, sizeof(hbuf), MSG_PEEK);
+		/* NB: Host: header needs to be in the first 2048 bytes
+		 * we need to fix this if we want to do more than POC
+		 */
+		bzero(hbuf, sizeof(hbuf));
+		cc = recv(sock, hbuf, sizeof(hbuf) - 1, MSG_PEEK);
 		if (cc == 0)
 			return (0);
 		if (cc == -1 && errno == EINTR)
