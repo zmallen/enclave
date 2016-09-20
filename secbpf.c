@@ -149,6 +149,9 @@ static const struct sock_filter preauth_insns[] = {
 #ifdef __NR_get_robust_list
 	SC_ALLOW(get_robust_list),
 #endif
+#ifdef __NR_getsockopt
+	SC_ALLOW(getsockopt),
+#endif
 	/* Default deny */
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_FILTER_FAIL),
 };

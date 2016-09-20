@@ -69,7 +69,6 @@ edge_peek_hosthdr(int sock, regex_t *rp)
 {
 	char hbuf[2048], *state, *k, *v, *ptr;
 	ssize_t cc;
-	regex_t rd;
 
 	while (1) {
 		/* NB: Host: header needs to be in the first 2048 bytes
@@ -83,7 +82,7 @@ edge_peek_hosthdr(int sock, regex_t *rp)
 			continue;
 		state = &hbuf[0];
 		while ((ptr = strtok_r(state, "\n", &state))) {
-			edge_parse_line(&rd, ptr, &k, &v);
+			edge_parse_line(rp, ptr, &k, &v);
 			if (k == NULL || v == NULL)
 				continue;
 			free(k);
@@ -97,22 +96,37 @@ edge_peek_hosthdr(int sock, regex_t *rp)
 void *
 edge_accept(void *arg)
 {
-	struct sockaddr_storage addrstorage;
+	struct sockaddr_storage addrs;
 	struct listener *ent;
+	int nsock, fam;
 	socklen_t len;
 	regex_t rd;
-	int nsock;
 
-
-	len = sizeof(struct sockaddr_storage);
 	ent = (struct listener *)arg;
+	len = sizeof(int);
+	if (getsockopt(ent->l_fd, SOL_SOCKET, SO_DOMAIN, &fam, &len) == 1) {
+		(void) fprintf(stderr, "getsockopt failed: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	switch (fam) {
+	case PF_INET:
+		len = sizeof(struct sockaddr_in);
+		break;
+	case PF_INET6:
+		len = sizeof(struct sockaddr_in6);
+		break;
+	default:
+		(void) fprintf(stderr, "un-supported address family\n");
+		exit(1);
+	}
 	printf("in thread accept on fd %d\n", ent->l_fd);
         if (regcomp(&rd, "^(.*): (.*)", REG_EXTENDED)) {
                 (void) fprintf(stderr, "failed to compile re\n");
                 return (NULL);
         }
 	while (1) {
-		nsock = accept(ent->l_fd, (struct sockaddr *)&addrstorage, &len);
+		nsock = accept(ent->l_fd, (struct sockaddr *)&addrs, &len);
 		if (nsock == -1) {
 			(void) fprintf(stderr, "accept failed: %s\n",
 			    strerror(errno));
