@@ -97,19 +97,20 @@ void *
 edge_accept(void *arg)
 {
 	struct sockaddr_storage addrs;
+	struct sockaddr sa;
 	struct listener *ent;
-	int nsock, fam;
+	int nsock;
 	socklen_t len;
 	regex_t rd;
 
 	ent = (struct listener *)arg;
-	len = sizeof(int);
-	if (getsockopt(ent->l_fd, SOL_SOCKET, SO_DOMAIN, &fam, &len) == 1) {
+	len = sizeof(sa);
+	if (getsockname(ent->l_fd, &sa, &len) == -1) {
 		(void) fprintf(stderr, "getsockopt failed: %s\n",
 		    strerror(errno));
 		exit(1);
 	}
-	switch (fam) {
+	switch (sa.sa_family) {
 	case PF_INET:
 		len = sizeof(struct sockaddr_in);
 		break;
