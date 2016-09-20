@@ -32,6 +32,9 @@
 
 static struct listener *head, *tail;
 
+extern int	 yyparse(void);
+extern FILE	*yyin;
+
 struct listener *
 add_listener(int fd)
 {
@@ -91,17 +94,21 @@ main(int argc, char *argv [])
 	struct cmd_options cmd;
 	struct listener *ent;
 	int ch, j;
+	FILE *fp;
 
 	cmd.family = PF_UNSPEC;
 	cmd.src = NULL;
 	cmd.port = "http";
-	while ((ch = getopt(argc, argv, "46n:p:s:")) != -1)
+	while ((ch = getopt(argc, argv, "46c:n:p:s:")) != -1)
 		switch (ch) {
 		case '4':
 			cmd.family = PF_INET;
 			break;
 		case '6':
 			cmd.family = PF_INET6;
+			break;
+		case 'c':
+			cmd.config = optarg;
 			break;
 		case 'n':
 			cmd.name = optarg;
@@ -114,6 +121,10 @@ main(int argc, char *argv [])
 			break;
 		}
 	priv_init(&cmd);
+	fp = priv_config_open();
+	yyin = fp;
+	yyparse();
+	fclose(fp);
 	if (cmd.name != NULL) {
 		do_cached(&cmd);
 		return (0);

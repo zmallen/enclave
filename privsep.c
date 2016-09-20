@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,6 +158,18 @@ priv_init(struct cmd_options *clp)
 		if (may_read(socks[0], &cmd, sizeof(int)))
 			break;
 		switch (cmd) {
+		case PRIV_GET_CONF_FD:
+			{
+			int fd;
+
+			fd = open(clp->config, O_RDONLY);
+			if (fd == -1) {
+				(void) fprintf(stderr, "config open: %s\n", strerror(errno));
+				exit(1);
+			}
+			send_fd(socks[0], fd);
+			close(fd);
+			}
 		case PRIV_CONNECT_UNIX:
 		case PRIV_BIND_UNIX:
 			{
@@ -309,3 +322,22 @@ priv_bind_unix(char *name)
 	s = receive_fd(priv_fd);
 	return (s);
 }
+
+FILE *
+priv_config_open(void)
+{
+	FILE *fp;
+	int cmd, s;
+
+	cmd = PRIV_GET_CONF_FD;
+	must_write(priv_fd, &cmd, sizeof(cmd));
+	s = receive_fd(priv_fd);
+	fp = fdopen(s, "r");
+	if (fp == NULL) {
+		(void) fprintf(stderr, "fdopen failed: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	return (fp);
+}
+
