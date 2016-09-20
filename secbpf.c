@@ -115,6 +115,9 @@ static const struct sock_filter preauth_insns[] = {
 #ifdef __NR_sendmsg
 	SC_ALLOW(sendmsg),
 #endif
+#ifdef __NR_recvfrom
+	SC_ALLOW(recvfrom),
+#endif
 #ifdef __NR_recvmsg
 	SC_ALLOW(recvmsg),
 #endif

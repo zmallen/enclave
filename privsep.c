@@ -52,6 +52,7 @@
 #include "privsep_fdpass.h"
 #include "secbpf.h"
 #include "unix.h"
+#include "util.h"
 
 static volatile pid_t child_pid = -1;
 static int priv_fd = -1;
@@ -160,7 +161,7 @@ priv_init(struct cmd_options *clp)
 		case PRIV_BIND_UNIX:
 			{
 			int sock;
-			char sockname[256];
+			char sockname[MAX_PATH];
 
 			bzero(sockname, sizeof(sockname));
 			must_read(socks[0], sockname, sizeof(sockname) - 1);
@@ -178,8 +179,11 @@ priv_init(struct cmd_options *clp)
 				exit(1);
 			}
 			must_write(socks[0], esp, sizeof(*esp));
-			for (i = 0; i < esp->nsocks; i++)
+			for (i = 0; i < esp->nsocks; i++) {
 				send_fd(socks[0], esp->socks[i]);
+				close(esp->socks[i]);
+			}
+			free(esp);
 			break;
 		}
 		/* NB: switch cmd PRIVSEP_GET_CTL_SOCKS */
@@ -279,12 +283,12 @@ priv_get_ctl_socks(void)
 int
 priv_connect_unix(char *name)
 {
-	char path[256];
+	char path[MAX_PATH];
 	int cmd, s;
 
 	cmd = PRIV_CONNECT_UNIX;
 	bzero(path, sizeof(path));
-	strcpy(path, name);
+	bsd_strlcpy(path, name, MAX_PATH);
 	must_write(priv_fd, &cmd, sizeof(cmd));
 	must_write(priv_fd, path, sizeof(path));
 	s = receive_fd(priv_fd);
@@ -294,12 +298,12 @@ priv_connect_unix(char *name)
 int
 priv_bind_unix(char *name)
 {
-	char path[256];
+	char path[MAX_PATH];
 	int cmd, s;
 
 	cmd = PRIV_BIND_UNIX;
 	bzero(path, sizeof(path));
-	strcpy(path, name);
+	bsd_strlcpy(path, name, MAX_PATH);
 	must_write(priv_fd, &cmd, sizeof(cmd));
 	must_write(priv_fd, path, sizeof(path));
 	s = receive_fd(priv_fd);

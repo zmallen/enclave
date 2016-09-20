@@ -72,11 +72,12 @@ do_cached(struct cmd_options *cmd)
 		while (1) {
 			size_t cc;
 
+			bzero(buf, sizeof(buf) - 1);
 			cc = recv(osock, buf, sizeof(buf), 0);
-			printf("read %zu bytes\n", cc);
-			printf("%s\n", buf);
 			if (cc == 0)
 				break;
+			printf("read %zu bytes\n", cc);
+			printf("%s\n", buf);
 		}
 		(void) close(cs);
 	}
