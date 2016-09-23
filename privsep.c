@@ -169,6 +169,7 @@ priv_init(struct cmd_options *clp)
 			}
 			send_fd(socks[0], fd);
 			close(fd);
+			break;
 			}
 		case PRIV_CONNECT_UNIX:
 		case PRIV_BIND_UNIX:

@@ -1,0 +1,26 @@
+#
+# Edge node
+#
+edge {
+        host = "127.0.0.1";
+        family = any;
+        port = "80";
+}
+
+occupant "trusted" {
+        backend {
+                host = "hostname";
+                port = "whatever";
+        }
+        logfile = "/path";
+        socket = "/path/to/socket";
+}
+
+occupant "un-trusted" {
+        backend {
+                host = "hostname2";
+                port = "80";
+        }
+        logfile = "/path2";
+        socket = "/path/to/other/socket";
+}
