@@ -21,4 +21,4 @@ edged:	$(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS)
 
 clean:
-	rm -fr *.o $(TARGETS) *.plist *.gcno grammar.tab.c lex.yy.c
+	rm -fr *.o $(TARGETS) *.plist *.gcno grammar.tab.c grammar.tab.h lex.yy.c
