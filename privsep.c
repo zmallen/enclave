@@ -72,9 +72,6 @@ volatile sig_atomic_t gotsig_chld = 0;
 /* Proto-types */
 static void sig_pass_to_chld(int);
 static void sig_chld(int);
-int  may_read(int, void *, size_t);
-void must_read(int, void *, size_t);
-void must_write(int, void *, size_t);
 
 static void
 sig_chld(int sig)

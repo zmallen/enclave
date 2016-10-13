@@ -15,7 +15,10 @@
 #include <stdio.h>
 #include <stddef.h>  /* for offsetof */
 
-#include <privsep_libc.h>
+#include "util.h"
+#include "edged.h"
+#include "privsep_libc.h"
+#include "privsep_fdpass.h"
 
 extern int priv_sep_on, priv_fd, child_pid;
 
@@ -47,9 +50,8 @@ process_getaddr_data(struct priv_getaddrinfo_results *vec, size_t blen,
     struct addrinfo **res)
 {
 	struct priv_getaddrinfo_results *ent;
-	struct addrinfo sentinel, *cres;
-	struct addrinfo *head;
-	int nitems, k;
+	struct addrinfo *cres, *head;
+	int nitems;
 
 	if (blen % sizeof(*ent) != 0)
 		return (-1);
@@ -85,8 +87,8 @@ getaddrinfo(const char *hostname, const char *servname, const struct addrinfo *h
 	}
 	/* NB: locking for threading */
 	memset(&ga_args, 0, sizeof(ga_args));
-	bsd_strlcpy(&ga_args.hostname, hostname, sizeof(ga_args.hostname));
-	bsd_strlcpy(&ga_args.servname, servname, sizeof(ga_args.servname));
+	bsd_strlcpy(ga_args.hostname, hostname, sizeof(ga_args.hostname));
+	bsd_strlcpy(ga_args.servname, servname, sizeof(ga_args.servname));
 	memcpy(&ga_args.hints, hints, sizeof(ga_args.hints));
 	cmd = PRIV_LIBC_GETADDRINFO;
 	must_write(priv_fd, &cmd, sizeof(cmd));

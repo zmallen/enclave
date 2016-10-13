@@ -1,8 +1,8 @@
 CC?=	cc
 CFLAGS= -Wall -g -fstack-protector -DSECCOMP_AUDIT_ARCH=AUDIT_ARCH_X86_64 -DSECCOMP_FILTER_DEBUG
 TARGETS=	edged 
-OBJ=	grammar.tab.o lex.yy.o edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o util.o
-LIBS=	-lpthread
+OBJ=	grammar.tab.o lex.yy.o edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o util.o privsep_libc.o
+LIBS=	-lpthread -ldl
 
 all:	$(TARGETS) privsep_libc.o libbad.so
 
@@ -21,11 +21,11 @@ libbad.so:
 	$(CC) -fpic -c libbad.c
 	$(CC) -shared -o libbad.so libbad.o
 
-privsep_libc.o:
-	$(CC) -fPIC -shared -o privsep_libc.so privsep_libc.c -ldl -I.
+privsep_libc.so:
+	$(CC) -fPIC -shared -o privsep_libc.so privsep_libc.c -I.
 
 edged:	$(OBJ) libbad.so
-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS) -Wl,-E -lbad -L.
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS) -Wl,-E -lbad -L. 
 
 clean:
 	rm -fr *.o $(TARGETS) *.plist *.so *.gcno grammar.tab.c grammar.tab.h lex.yy.c
