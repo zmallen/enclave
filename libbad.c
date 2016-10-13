@@ -37,5 +37,6 @@ foobar(void)
 	}
 	printf("got open!: %d\n", fd);
 	close(fd);
+	return (0);
 }
 
