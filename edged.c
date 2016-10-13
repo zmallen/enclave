@@ -129,13 +129,10 @@ main(int argc, char *argv [])
 	priv_init(&cmd);
 	foobar();
 	sneaky_lookup();
-	printf("after priv init\n");
 	fp = priv_config_open();
-	printf("after priv_config_open\n");
 	yyin = fp;
 	yyparse();
 	fclose(fp);
-	printf("after yyparse()\n");
 	if (cmd.name != NULL) {
 		do_cached(&cmd);
 		return (0);
@@ -154,7 +151,6 @@ main(int argc, char *argv [])
 		(void) fprintf(stdout, "launched thread for fd %d\n",
 		    es->socks[j]);
 	}
-	printf("after thread create\n");
 	while (head != NULL) {
 		pthread_join(head->l_thr, &head->l_ret);
 		head = head->l_next;
