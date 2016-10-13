@@ -16,7 +16,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
-
+#ifdef __FreeBSD__
+#include <netinet/in.h>
+#endif
 #include <netdb.h>
 #include <stdio.h>
 #include <strings.h>
