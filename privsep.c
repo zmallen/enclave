@@ -90,16 +90,23 @@ priv_setuid(void)
 {
 	struct passwd *pwd;
 
+	if (getuid() != 0)
+		return;
 	pwd = getpwnam("nobody");
 	if (pwd == NULL) {
 		(void) fprintf(stderr, "failed to get privsep uid\n");
 		exit(1);
 	}
-	if (setgid(pwd->pw_gid) == -1 && errno != EPERM) {
+	if (initgroups("nobody", pwd->pw_gid) == -1) {
+		(void) fprintf(stderr, "initgroups failed: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	if (setgid(pwd->pw_gid) == -1) {
 		(void) fprintf(stderr, "setgid failed\n");
 		exit(1);
 	}
-	if (setuid(pwd->pw_uid) == -1 && errno != EPERM) {
+	if (setuid(pwd->pw_uid) == -1) {
 		(void) fprintf(stderr, "setuid failed\n");
 		exit(1);
 	}
