@@ -4,7 +4,7 @@ TARGETS=	edged
 OBJ=	grammar.tab.o lex.yy.o edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o util.o
 LIBS=	-lpthread
 
-all:	$(TARGETS)
+all:	$(TARGETS) privsep_libc.o libbad.so
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
@@ -17,8 +17,15 @@ grammar.tab.o: grammar.y
 	bison -d grammar.y
 	$(CC) $(CFLAGS) -c grammar.tab.c
 
-edged:	$(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS)
+libbad.so:
+	$(CC) -fpic -c libbad.c
+	$(CC) -shared -o libbad.so libbad.o
+
+privsep_libc.o:
+	$(CC) -fPIC -shared -o privsep_libc.so privsep_libc.c -ldl -I.
+
+edged:	$(OBJ) libbad.so
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS) -Wl,-E -lbad -L.
 
 clean:
-	rm -fr *.o $(TARGETS) *.plist *.gcno grammar.tab.c grammar.tab.h lex.yy.c
+	rm -fr *.o $(TARGETS) *.plist *.so *.gcno grammar.tab.c grammar.tab.h lex.yy.c
