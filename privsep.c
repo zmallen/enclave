@@ -290,7 +290,7 @@ priv_init(struct config_options *clp)
 			must_write(socks[0], &curlen, sizeof(curlen));
 			must_write(socks[0], vec, curlen);
 			}
-
+			break;
 		default:
 			(void) fprintf(stderr, "got request for unknown priv\n");
 		}
