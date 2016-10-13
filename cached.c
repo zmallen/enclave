@@ -32,7 +32,7 @@
 int
 main(int argc, char *argv [])
 {
-	struct cmd_options cmd;
+	struct config_options cmd;
 	int ch, sock;
 
 	cmd.name = NULL;

@@ -31,6 +31,7 @@
  */
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #ifdef __FreeBSD__
@@ -39,32 +40,41 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <netdb.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <grp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <pwd.h>
 
+
+#include "privsep_libc.h"
 #include "edged.h"
 #include "privsep.h"
 #include "net.h"
 #include "privsep_fdpass.h"
+
+#include <stdarg.h>
 #include "secbpf.h"
 #include "unix.h"
 #include "util.h"
 
-static volatile pid_t child_pid = -1;
-static int priv_fd = -1;
+volatile pid_t child_pid = -1;
+int priv_fd = -1;
+int priv_sep_on = 0;
+int __real_open(const char *path, int flags, ...);
+
 volatile sig_atomic_t gotsig_chld = 0;
 
 /* Proto-types */
 static void sig_pass_to_chld(int);
 static void sig_chld(int);
-static int  may_read(int, void *, size_t);
-static void must_read(int, void *, size_t);
-static void must_write(int, void *, size_t);
+int  may_read(int, void *, size_t);
+void must_read(int, void *, size_t);
+void must_write(int, void *, size_t);
 
 static void
 sig_chld(int sig)
@@ -90,6 +100,7 @@ priv_setuid(void)
 {
 	struct passwd *pwd;
 
+	/* NB: getuid check is not sufficient for but leave it for now */
 	if (getuid() != 0)
 		return;
 	pwd = getpwnam("nobody");
@@ -113,7 +124,7 @@ priv_setuid(void)
 }
 
 int
-priv_init(struct cmd_options *clp)
+priv_init(struct config_options *clp)
 {
 	int i, socks[2], cmd;
 	struct edge_socks *esp;
@@ -149,6 +160,7 @@ priv_init(struct cmd_options *clp)
 		/* NB: seccomp_bpf, chroot or whatever else
 		   Child - drop privileges and return */
 		priv_fd = socks[1];
+		priv_sep_on = 1;
 		return 0;
 	}
 	/* Pass ALRM/TERM/HUP/INT/QUIT through to child, and accept CHLD */
@@ -206,6 +218,81 @@ priv_init(struct cmd_options *clp)
 			}
 			free(esp);
 			break;
+		/*
+		 * Add support for our libc highjack shims if required.
+		 */
+		case PRIV_LIBC_OPEN:
+			{
+			struct priv_open_args oa;
+			int e, fd;
+
+			printf("got open request from surrogate libc\n");
+			must_read(socks[0], &oa, sizeof(oa));
+			fd = open(oa.pathname, O_RDONLY);
+			if (fd == -1) {
+				e = errno;
+				must_write(socks[0], &e, sizeof(e));
+				break;
+			}
+			e = 0;
+			must_write(socks[0], &e, sizeof(e));
+			send_fd(socks[0], fd);
+			}
+			break;
+		case PRIV_LIBC_GETADDRINFO:
+			{
+			struct priv_getaddrinfo_results *ent, *vec;
+			struct priv_getaddrinfo_args ga_args;
+			struct addrinfo *res, *res0;
+			size_t vec_used, vec_alloc;
+			size_t curlen;
+			int error;
+
+			must_read(socks[0], &ga_args, sizeof(ga_args));
+			error = getaddrinfo(ga_args.hostname, ga_args.servname, &ga_args.hints,
+			    &res0);
+			if (error != 0) {
+				printf("getaddrinfo error: %s!\n", gai_strerror(error));
+			}
+			/* report success/failure */
+			must_write(socks[0], &error, sizeof(error));
+			if (error != 0)
+				break;
+			vec_used = 0;
+			vec_alloc = 0;
+			for (res = res0; res; res = res->ai_next) {
+				if (vec == NULL) {
+					vec_alloc = sizeof(*ent);
+					vec = calloc(1, vec_alloc);
+				} else {
+					vec_alloc = vec_alloc + sizeof(*ent);
+					vec = realloc(vec,vec_alloc);
+				}
+				ent = &vec[vec_used++];
+				ent->ai_flags = res->ai_flags;
+				ent->ai_family = res->ai_family;
+				ent->ai_socktype = res->ai_socktype;
+				ent->ai_protocol = res->ai_protocol;
+				ent->ai_addrlen = res->ai_addrlen;
+				memcpy(&ent->sas, res->ai_addr, res->ai_addrlen);
+				if (res->ai_canonname != NULL) {
+					bsd_strlcpy(ent->ai_canonname, res->ai_canonname,
+					    sizeof(ent->ai_canonname));
+				} else
+					ent->ai_canonname[0] = '\0';
+			}
+			curlen = vec_used * sizeof(*ent);
+			if (curlen == 0) {
+				curlen = -1;
+				must_write(socks[0], &curlen, sizeof(curlen));
+				break;
+			}
+			must_write(socks[0], &curlen, sizeof(curlen));
+			must_write(socks[0], vec, curlen);
+			}
+
+		default:
+			(void) fprintf(stderr, "got request for unknown priv\n");
 		}
 		/* NB: switch cmd PRIVSEP_GET_CTL_SOCKS */
 	}
@@ -213,7 +300,7 @@ priv_init(struct cmd_options *clp)
 }
 
 /* Read all data or return 1 for error.  */
-static int
+int
 may_read(int fd, void *buf, size_t n)
 {
 	char *s = buf;
@@ -236,7 +323,7 @@ may_read(int fd, void *buf, size_t n)
 
 /* Read data with the assertion that it all must come through, or
  * else abort the process.  Based on atomicio() from openssh. */
-static void
+void
 must_read(int fd, void *buf, size_t n)
 {
 	char *s = buf;
@@ -258,7 +345,7 @@ must_read(int fd, void *buf, size_t n)
 
 /* Write data with the assertion that it all has to be written, or
  * else abort the process.  Based on atomicio() from openssh. */
-static void
+void
 must_write(int fd, void *buf, size_t n)
 {
 	char *s = buf;
@@ -348,4 +435,3 @@ priv_config_open(void)
 	}
 	return (fp);
 }
-

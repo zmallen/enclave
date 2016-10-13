@@ -16,7 +16,7 @@
 #ifndef EDGED_DOT_H_
 #define	EDGED_DOT_H_
 
-struct cmd_options {
+struct config_options {
 	int	 family;
 	char	*src;
 	char	*port;

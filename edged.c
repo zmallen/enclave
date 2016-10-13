@@ -15,6 +15,7 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
 
 #include <netdb.h>
 #include <stdio.h>
@@ -24,11 +25,15 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <fcntl.h>
+#include <stdarg.h>
 
 #include "edged.h"
 #include "net.h"
 #include "privsep.h"
 #include "privsep_fdpass.h"
+
+#include "libbad.h"
 
 static struct listener *head, *tail;
 
@@ -56,7 +61,7 @@ add_listener(int fd)
 }
 
 void
-do_cached(struct cmd_options *cmd)
+do_cached(struct config_options *cmd)
 {
 	int sock, cs;
 	int osock;
@@ -91,7 +96,7 @@ int
 main(int argc, char *argv [])
 {
 	struct edge_socks *es;
-	struct cmd_options cmd;
+	struct config_options cmd;
 	struct listener *ent;
 	int ch, j;
 	FILE *fp;
@@ -99,6 +104,7 @@ main(int argc, char *argv [])
 	cmd.family = PF_UNSPEC;
 	cmd.src = NULL;
 	cmd.port = "http";
+	cmd.name = NULL;
 	while ((ch = getopt(argc, argv, "46c:n:p:s:")) != -1)
 		switch (ch) {
 		case '4':
@@ -121,10 +127,15 @@ main(int argc, char *argv [])
 			break;
 		}
 	priv_init(&cmd);
+	foobar();
+	sneaky_lookup();
+	printf("after priv init\n");
 	fp = priv_config_open();
+	printf("after priv_config_open\n");
 	yyin = fp;
 	yyparse();
 	fclose(fp);
+	printf("after yyparse()\n");
 	if (cmd.name != NULL) {
 		do_cached(&cmd);
 		return (0);
@@ -143,6 +154,7 @@ main(int argc, char *argv [])
 		(void) fprintf(stdout, "launched thread for fd %d\n",
 		    es->socks[j]);
 	}
+	printf("after thread create\n");
 	while (head != NULL) {
 		pthread_join(head->l_thr, &head->l_ret);
 		head = head->l_next;

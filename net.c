@@ -15,6 +15,7 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
 
 #include <netdb.h>
 #include <stdio.h>
@@ -150,7 +151,7 @@ edge_cleanup_socks(struct edge_socks *es)
 }
 
 struct edge_socks *
-edge_setup_sockets(struct cmd_options *cmd)
+edge_setup_sockets(struct config_options *cmd)
 {
 	struct addrinfo hints, *res, *res0;
 	struct edge_socks *es;
