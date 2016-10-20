@@ -1,7 +1,7 @@
 CC?=	cc
 CFLAGS= -Wall -g -fstack-protector -DSECCOMP_AUDIT_ARCH=AUDIT_ARCH_X86_64 -DSECCOMP_FILTER_DEBUG
 TARGETS=	edged 
-OBJ=	grammar.tab.o lex.yy.o edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o util.o privsep_libc.o
+OBJ=	grammar.tab.o lex.yy.o edged.o privsep.o privsep_fdpass.o net.o secbpf.o unix.o util.o
 
 #
 OS := $(shell uname -s)
@@ -12,7 +12,7 @@ ifeq ($(OS), Linux)
 LIBS=   -lpthread -ldl
 endif
 
-all:	$(TARGETS) privsep_libc.o libbad.so
+all:	$(TARGETS) privsep_libc.so libbad.so
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
