@@ -23,6 +23,11 @@ struct priv_getaddrinfo_results {
 	char ai_canonname[256];
 };
 
+struct priv_socket_args {
+        int     domain;
+        int     type;
+        int     protocol;
+};
 enum {
         PRIV_RESERVED,
         PRIV_GET_CTL_SOCKS,
@@ -30,7 +35,8 @@ enum {
         PRIV_CONNECT_UNIX,
         PRIV_GET_CONF_FD,
         PRIV_LIBC_OPEN,
-	PRIV_LIBC_GETADDRINFO
+	PRIV_LIBC_GETADDRINFO,
+        PRIV_LIBC_SOCKET
 };
 
 #endif	/* PRIVSEP_DOT_H_ */

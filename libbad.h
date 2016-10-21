@@ -3,5 +3,6 @@
 
 int foobar(void);
 int sneaky_lookup(void);
+int some_doing_socket(void);
 
 #endif

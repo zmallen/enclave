@@ -6,6 +6,22 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+
+int
+some_doing_socket(void)
+{
+        int sock;
+
+        sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sock == -1) {
+            (void) fprintf(stderr, "socket failed: %s\n",
+                        strerror(errno));
+            exit(1);
+        }
+        return (sock);
+}
 
 int
 sneaky_lookup(void)

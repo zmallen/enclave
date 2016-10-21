@@ -236,6 +236,28 @@ priv_init(struct config_options *clp)
 			send_fd(socks[0], fd);
 			}
 			break;
+                case PRIV_LIBC_SOCKET:
+                        {
+                        struct priv_socket_args sa;
+                        int e, sock;
+
+                        must_read(socks[0], &sa, sizeof(sa));
+                        if (sa.type != SOCK_STREAM) {
+                            e = EPERM;
+                            must_write(socks[0], &e, sizeof(e));
+                            break;
+                        }
+                        sock = socket(sa.domain, sa.type, sa.protocol);
+                        if (sock == -1) {
+                            e = errno;
+                            must_write(socks[0], &e, sizeof(e));
+                            break;
+                        }
+                        e = 0;
+                        must_write(socks[0], &e, sizeof(e));
+                        send_fd(socks[0], sock);
+                        break;
+                        }
 		case PRIV_LIBC_GETADDRINFO:
 			{
 			struct priv_getaddrinfo_results *ent, *vec;

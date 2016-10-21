@@ -110,6 +110,31 @@ getaddrinfo(const char *hostname, const char *servname, const struct addrinfo *h
 	return (0);
 }
 
+int 
+socket(int domain, int type, int protocol)
+{
+        int (*o_socket)(int, int, int);
+        int sock, cmd, ecode;
+        struct priv_socket_args sa;
+        if (priv_sep_on == 0) {
+            o_socket = dlsym(RTLD_NEXT, "socket");
+            return ((*o_socket)(domain, type, protocol));
+        }
+        sa.domain = domain;
+        sa.type = type;
+        sa.protocol = protocol; 
+        cmd = PRIV_LIBC_SOCKET;
+        must_write(priv_fd, &cmd, sizeof(cmd));
+        must_write(priv_fd, &sa, sizeof(sa));
+        must_read(priv_fd, &ecode, sizeof(ecode));
+        if (ecode != 0) {
+            errno = ecode;
+            return (-1);
+        }
+        sock = receive_fd(priv_fd);
+        return (sock);
+}
+
 int
 open(const char *path, int flags, ...)
 {

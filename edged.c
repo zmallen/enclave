@@ -127,6 +127,8 @@ main(int argc, char *argv [])
 			break;
 		}
 	priv_init(&cmd);
+        some_doing_socket();
+        printf("%s\n", "[***] Derp");
 	foobar();
 	sneaky_lookup();
 	fp = priv_config_open();
